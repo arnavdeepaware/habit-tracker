@@ -1,12 +1,30 @@
 import datetime
 import json
 from flask import Flask, jsonify, request
-from flask_cors import CORS 
+from flask_cors import CORS
 import sqlite3
 
-#Flask
+# Flask
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS with additional options
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://127.0.0.1:5500", "http://localhost:5500"],
+        "methods": ["GET", "POST", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": True
+    }
+})
+
+# Add OPTIONS response for all routes
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'http://127.0.0.1:5500')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 #sqlite 
 def get_db():
@@ -59,7 +77,6 @@ def get_day_from_date():
     today = datetime.date.today()
     start_of_year = datetime.date(today.year, 1, 1)
     days = (today - start_of_year).days
-
     return days
 
 class habit:
@@ -82,6 +99,27 @@ class habit:
             "name": self.name,
             "streak": self.streak
         }
+
+# Add OPTIONS handler for each endpoint
+@app.route('/create-habit', methods=['OPTIONS'])
+def handle_create_habit_options():
+    return '', 204
+
+@app.route('/update-streak', methods=['OPTIONS'])
+def handle_update_streak_options():
+    return '', 204
+
+@app.route('/get-habit', methods=['OPTIONS'])
+def handle_get_habit_options():
+    return '', 204
+
+@app.route('/delete-habit', methods=['OPTIONS'])
+def handle_delete_habit_options():
+    return '', 204
+
+@app.route('/get-all', methods=['OPTIONS'])
+def handle_get_all_options():
+    return '', 204
 
 #Endpoint to create a habit
 @app.route('/create-habit', methods=['POST'])
@@ -108,11 +146,10 @@ def create_habit():
         #Error for duplicated name
         except sqlite3.IntegrityError:
             connection.close()
-            return jsonify({f"Error: Habit '{name}' already exists in the database."}), 400
+            return jsonify({"error": f"Habit '{name}' already exists in the database."}), 400
         
     else:
         return jsonify({"error": "Name is required"}), 400
-    
 
 #Endpoint to update Streak
 @app.route('/update-streak', methods=["POST"])
@@ -147,10 +184,8 @@ def update_streak():
         else:
             connection.close()
             return jsonify({"error": "habit not found in database"}), 404
-
     else:
         return jsonify({"error": "Name is required"}), 400
-
 
 #Endpoint to get streak
 @app.route('/get-habit', methods=["GET"])
@@ -171,10 +206,9 @@ def get_habit():
             streak = json.loads(streak_json)
             return jsonify({"name": habit_name, "streak": streak}), 200
         else:
-            return jsonify({"error": f"Habit '{habit_name}' not found!"}), 404
+            return jsonify({"error": f"Habit '{name}' not found!"}), 404
     else:
         return jsonify({"error": "Name is required"}), 400
-
 
 #Endpoint to delete a habit
 @app.route('/delete-habit', methods=["POST"])
@@ -186,7 +220,6 @@ def delete_habit():
         return delete_habit_by_name(name)
     else:
         return jsonify({"error": "Name is required"}), 400
-
 
 #Endpoint to fetch all habits/rows
 @app.route('/get-all', methods=["GET"])
@@ -206,7 +239,6 @@ def get_all_habits():
         return json.dumps(habits_list)
     else:
         return json.dumps([])
-
 
 if __name__ == "__main__":
     app.run(debug=True)
