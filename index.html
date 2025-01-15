@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        body {
+            padding: 2rem;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .form-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #2ea44f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background-color: #2c974b;
+        }
+
+        .habits-container {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .habit-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .habit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .habit-title {
+            font-size: 1.25rem;
+            color: #333;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+
+        .streak-grid {
+            display: grid;
+            grid-template-columns: repeat(53, 1fr);
+            gap: 3px;
+            margin-top: 1rem;
+        }
+
+        .streak-cell {
+            aspect-ratio: 1;
+            background-color: #ebedf0;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .streak-cell.active {
+            background-color: #40c463;
+        }
+
+        .streak-cell:hover {
+            border: 1px solid #333;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 0.5rem;
+        }
+
+        .success-message {
+            color: #28a745;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Habit Tracker</h1>
+        </div>
+
+        <div class="form-container">
+            <div class="input-group">
+                <input type="text" id="habitName" placeholder="Enter habit name">
+                <button onclick="createHabit()">Create Habit</button>
+            </div>
+            <div id="createMessage"></div>
+        </div>
+
+        <div class="habits-container" id="habitsContainer">
+            <!-- Habits will be dynamically added here -->
+        </div>
+    </div>
+
+    <script>
+        // API endpoints
+        const API_BASE = 'http://127.0.0.1:5000';
+        const ENDPOINTS = {
+            CREATE: '/create-habit',
+            UPDATE: '/update-streak',
+            GET_ALL: '/get-all',
+            DELETE: '/delete-habit',
+        };
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHabits();
+        });
+
+        // Load all habits
+        async function loadHabits() {
+            try {
+                const response = await fetch(`${API_BASE}${ENDPOINTS.GET_ALL}`);
+                const habits = await response.json();
+                
+                const container = document.getElementById('habitsContainer');
+                container.innerHTML = '';
+
+                habits.forEach(habit => {
+                    const streakData = JSON.parse(habit.streak);
+                    container.appendChild(createHabitCard(habit.habit_name, streakData));
+                });
+            } catch (error) {
+                console.error('Error loading habits:', error);
+            }
+        }
+
+        // Create a new habit
+        async function createHabit() {
+            const nameInput = document.getElementById('habitName');
+            const messageDiv = document.getElementById('createMessage');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                showMessage(messageDiv, 'Please enter a habit name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}${ENDPOINTS.CREATE}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(messageDiv, 'Habit created successfully!', 'success');
+                    nameInput.value = '';
+                    loadHabits();
+                } else {
+                    showMessage(messageDiv, data.error || 'Error creating habit', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error connecting to server', 'error');
+            }
+        }
+
+        // Update streak for a habit
+        async function updateStreak(habitName, cell) {
+            try {
+                const response = await fetch(`${API_BASE}${ENDPOINTS.UPDATE}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: habitName }),
+                });
+
+                if (response.ok) {
+                    cell.classList.add('active');
+                }
+            } catch (error) {
+                console.error('Error updating streak:', error);
+            }
+        }
+
+        // Delete a habit
+        async function deleteHabit(habitName) {
+            try {
+                const response = await fetch(`${API_BASE}${ENDPOINTS.DELETE}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: habitName }),
+                });
+
+                if (response.ok) {
+                    loadHabits();
+                }
+            } catch (error) {
+                console.error('Error deleting habit:', error);
+            }
+        }
+
+        // Create a habit card element
+        function createHabitCard(habitName, streakData) {
+            const card = document.createElement('div');
+            card.className = 'habit-card';
+
+            const header = document.createElement('div');
+            header.className = 'habit-header';
+
+            const title = document.createElement('h3');
+            title.className = 'habit-title';
+            title.textContent = habitName;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => deleteHabit(habitName);
+
+            header.appendChild(title);
+            header.appendChild(deleteBtn);
+
+            const grid = document.createElement('div');
+            grid.className = 'streak-grid';
+
+            streakData.forEach((isActive, index) => {
+                const cell = document.createElement('div');
+                cell.className = `streak-cell${isActive ? ' active' : ''}`;
+                cell.onclick = () => updateStreak(habitName, cell);
+                grid.appendChild(cell);
+            });
+
+            card.appendChild(header);
+            card.appendChild(grid);
+
+            return card;
+        }
+
+        // Utility function to show messages
+        function showMessage(element, message, type) {
+            element.textContent = message;
+            element.className = type === 'error' ? 'error-message' : 'success-message';
+            setTimeout(() => {
+                element.textContent = '';
+                element.className = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
